@@ -344,15 +344,34 @@ if (photoFile && photoBase64) {
   const drawing =
   `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5334000" cy="3600000"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="99" name="Foto"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="99" name="Foto"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${newRid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5334000" cy="3600000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
 
-  // Replace placeholder
-  xml = xml.split("<Foto>").join(drawing);
-  xml = xml.split("&lt;Foto&gt;").join(drawing);
+  // Replace the entire <w:p>...</w:p> paragraph that contains &lt;Foto&gt;
+  // An image CANNOT live inside <w:r><w:t> — it must replace the whole paragraph.
+  // We find the paragraph boundaries manually to avoid greedy regex issues.
+  const fotoToken = "&lt;Foto&gt;";
+  const fotoIdx = xml.indexOf(fotoToken);
+  if (fotoIdx !== -1) {
+    // Walk backwards to find the opening <w:p
+    const pOpen = xml.lastIndexOf("<w:p ", fotoIdx) !== -1
+      ? xml.lastIndexOf("<w:p ", fotoIdx)
+      : xml.lastIndexOf("<w:p>", fotoIdx);
+    // Find the closing </w:p> after the token
+    const pClose = xml.indexOf("</w:p>", fotoIdx) + "</w:p>".length;
+    const newPara = '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>' + drawing + '</w:p>';
+    xml = xml.slice(0, pOpen) + newPara + xml.slice(pClose);
+  }
 
 } else {
 
-  // Remove placeholder if no photo
-  xml = xml.split("<Foto>").join("");
-  xml = xml.split("&lt;Foto&gt;").join("");
+  // Remove placeholder paragraph if no photo
+  const fotoToken2 = "&lt;Foto&gt;";
+  const fotoIdx2 = xml.indexOf(fotoToken2);
+  if (fotoIdx2 !== -1) {
+    const pOpen2 = xml.lastIndexOf("<w:p ", fotoIdx2) !== -1
+      ? xml.lastIndexOf("<w:p ", fotoIdx2)
+      : xml.lastIndexOf("<w:p>", fotoIdx2);
+    const pClose2 = xml.indexOf("</w:p>", fotoIdx2) + "</w:p>".length;
+    xml = xml.slice(0, pOpen2) + xml.slice(pClose2);
+  }
 
 }
 
