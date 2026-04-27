@@ -217,58 +217,40 @@ function handlePhoto(input) {
   photoExt = mime.includes('png') ? 'png' : 'jpg';
   photoFile = file;
 
-  const arrayReader = new FileReader();
-  arrayReader.onload = function(e) {
-    const buffer = e.target.result;
-    const orientation = getExifOrientation(buffer);
+  const url = URL.createObjectURL(file);
+  const img = new Image();
 
-    // Draw onto canvas to bake EXIF orientation into pixels.
-    // Word does NOT apply EXIF rotation, so we must do it ourselves.
-    const blob = new Blob([buffer], { type: file.type || 'image/jpeg' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = function() {
-      URL.revokeObjectURL(url);
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const w = img.naturalWidth, h = img.naturalHeight;
-      // orientations 5-8 swap axes
-      // For orientations 5-8 the image axes are swapped
-      const swapped = orientation >= 5;
-      canvas.width  = swapped ? h : w;
-      canvas.height = swapped ? w : h;
-      ctx.save();
-      // These transforms rotate/flip the pixel data so the result
-      // always matches what you see on screen (EXIF-corrected).
-      switch (orientation) {
-        case 2: ctx.translate(w, 0);    ctx.scale(-1,  1); break; // flip H
-        case 3: ctx.translate(w, h);    ctx.rotate(Math.PI); break; // 180°
-        case 4: ctx.translate(0, h);    ctx.scale( 1, -1); break; // flip V
-        case 5: ctx.rotate(Math.PI/2);  ctx.scale( 1, -1); break; // 90CW + flipH
-        case 6: ctx.translate(h, 0);    ctx.rotate(Math.PI/2); break;  // 90° CW
-        case 7: ctx.translate(h, 0);    ctx.rotate(Math.PI/2); ctx.scale(1,-1); break;
-        case 8: ctx.translate(0, w);    ctx.rotate(-Math.PI/2); break; // 90° CCW
-        default: break;
-      }
-      ctx.drawImage(img, 0, 0);
-      ctx.restore();
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
 
-      const correctedUrl = canvas.toDataURL(photoExt === 'png' ? 'image/png' : 'image/jpeg', 0.92);
-      photoBase64 = correctedUrl.split(',')[1];
+    // Keep the same orientation the browser shows on screen.
+    // This avoids double-rotating phone photos that already have EXIF orientation.
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    canvas.width = w;
+    canvas.height = h;
 
-      document.getElementById('preview-img').src = correctedUrl;
-      document.getElementById('photo-name-label').innerHTML =
-        '\u2713 ' + file.name +
-        ' <button class="btn-remove-photo" type="button" onclick="removePhoto()">Hiq</button>';
-      document.getElementById('photo-preview').style.display = 'block';
-      document.getElementById('upload-area').classList.add('has-photo');
-    };
-    img.src = url;
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+
+    const correctedUrl = canvas.toDataURL(photoExt === 'png' ? 'image/png' : 'image/jpeg', 0.92);
+    photoBase64 = correctedUrl.split(',')[1];
+
+    document.getElementById('preview-img').src = correctedUrl;
+    document.getElementById('photo-name-label').innerHTML =
+      '\u2713 ' + file.name +
+      ' <button class="btn-remove-photo" type="button" onclick="removePhoto()">Hiq</button>';
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('upload-area').classList.add('has-photo');
   };
-  arrayReader.onerror = function() {
+
+  img.onerror = function() {
+    URL.revokeObjectURL(url);
     showStatus('\u274C Nuk mund t\u00eb lexohet foto. Provo s\u00ebrish.', 'error');
   };
-  arrayReader.readAsArrayBuffer(file);
+
+  img.src = url;
 }
 
 function removePhoto() {
